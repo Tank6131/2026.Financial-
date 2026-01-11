@@ -93,40 +93,40 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="lg:col-span-2 card-bg p-6 rounded-2xl shadow-xl h-[450px]">
-        <h3 class="text-xl font-bold text-amber-100 mb-6">淨資產增長趨勢</h3>
-        <div class="h-[350px]"><canvas id="netWorthChart"></canvas></div>
-      </div>
-
-      <div class="card-bg p-6 rounded-2xl shadow-xl min-h-[450px]">
-  <h3 class="text-xl font-bold text-amber-100 mb-6">核心資產配置</h3>
-
-  <div class="h-[280px]">
-    <canvas id="assetAllocationChart"></canvas>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+  <!-- 左：淨資產增長趨勢 -->
+  <div class="lg:col-span-2 card-bg p-6 rounded-2xl shadow-xl">
+    <h3 class="text-xl font-bold text-amber-100 mb-6">淨資產增長趨勢</h3>
+    <div class="h-[350px]"><canvas id="netWorthChart"></canvas></div>
   </div>
 
-  <!-- 4 分類百分比 -->
-  <div class="mt-4 space-y-2 text-sm">
-    <div class="flex justify-between items-center gap-3">
-      <span class="text-slate-400 truncate">股票投資</span>
-      <span id="label-stock-pct" class="text-white tabular-nums shrink-0">--%</span>
+  <!-- 右：核心資產配置 -->
+  <div class="card-bg p-6 rounded-2xl shadow-xl min-h-[450px]">
+    <h3 class="text-xl font-bold text-amber-100 mb-6">核心資產配置</h3>
+    <div class="h-[280px]">
+      <canvas id="assetAllocationChart"></canvas>
     </div>
-    <div class="flex justify-between items-center gap-3">
-      <span class="text-slate-400 truncate">現金儲蓄</span>
-      <span id="label-cash-pct" class="text-white tabular-nums shrink-0">--%</span>
-    </div>
-    <div class="flex justify-between items-center gap-3">
-      <span class="text-slate-400 truncate">不動產</span>
-      <span id="label-re-pct" class="text-white tabular-nums shrink-0">--%</span>
-    </div>
-    <div class="flex justify-between items-center gap-3">
-      <span class="text-slate-400 truncate">其他</span>
-      <span id="label-others-pct" class="text-white tabular-nums shrink-0">--%</span>
+
+    <div class="mt-4 space-y-2 text-sm">
+      <div class="flex justify-between items-center gap-3">
+        <span class="text-slate-400 truncate">股票投資</span>
+        <span id="label-stock-pct" class="text-white tabular-nums shrink-0">--%</span>
+      </div>
+      <div class="flex justify-between items-center gap-3">
+        <span class="text-slate-400 truncate">現金儲蓄</span>
+        <span id="label-cash-pct" class="text-white tabular-nums shrink-0">--%</span>
+      </div>
+      <div class="flex justify-between items-center gap-3">
+        <span class="text-slate-400 truncate">不動產</span>
+        <span id="label-re-pct" class="text-white tabular-nums shrink-0">--%</span>
+      </div>
+      <div class="flex justify-between items-center gap-3">
+        <span class="text-slate-400 truncate">其他</span>
+        <span id="label-others-pct" class="text-white tabular-nums shrink-0">--%</span>
+      </div>
     </div>
   </div>
 </div>
-
     <div class="card-bg p-6 rounded-2xl shadow-xl">
       <h3 class="text-xl font-bold text-amber-100 mb-6">每月資產結構明細</h3>
       <div class="h-[350px]"><canvas id="assetStructureChart"></canvas></div>
