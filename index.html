@@ -14,48 +14,31 @@
 
   <style>
     @import url("https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap");
-
     body {
       font-family: "Noto Sans TC", sans-serif;
       background-color: #020617;
-      background-image: radial-gradient(
-        circle at 2px 2px,
-        rgba(212, 175, 55, 0.05) 1px,
-        transparent 0
-      );
+      background-image: radial-gradient(circle at 2px 2px, rgba(212, 175, 55, 0.05) 1px, transparent 0);
       background-size: 40px 40px;
       color: #f8fafc;
     }
-
     .gold-gradient-text {
       background: linear-gradient(to right, #d4af37, #fde68a, #d4af37);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
-
     .card-bg {
       background: rgba(15, 23, 42, 0.8);
       border: 1px solid rgba(212, 175, 55, 0.2);
       backdrop-filter: blur(10px);
     }
+    .gold-border { border-left: 4px solid #d4af37; }
 
-    .gold-border {
-      border-left: 4px solid #d4af37;
-    }
-
-    /* 載入中動畫 */
     #loader {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      top: 0; left: 0; width: 100%; height: 100%;
       background: #020617;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 100;
-      transition: opacity 0.5s;
+      display: flex; justify-content: center; align-items: center;
+      z-index: 100; transition: opacity 0.5s;
     }
   </style>
 </head>
@@ -106,12 +89,12 @@
       <div class="card-bg p-6 rounded-2xl shadow-xl border-l-4 border-red-500/50">
         <p class="text-slate-400 font-medium mb-4">總負債 (Liabilities)</p>
         <h2 id="kpi-liabilities" class="text-3xl font-bold text-white mb-1">$0</h2>
-        <p class="text-xs text-slate-500">含信貸與質押</p>
+        <p class="text-xs text-slate-500">含各類借貸與質押</p>
       </div>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="lg:col-span-2 card-bg p-6 rounded-2xl shadow-xl h-[450px]">
+      <div class="lg:colj:col-span-2 card-bg p-6 rounded-2xl shadow-xl h-[450px]">
         <h3 class="text-xl font-bold text-amber-100 mb-6">淨資產增長趨勢</h3>
         <div class="h-[350px]"><canvas id="netWorthChart"></canvas></div>
       </div>
@@ -148,17 +131,14 @@
     </div>
 
     <div class="card-bg p-6 rounded-2xl shadow-xl">
-      <h3 class="text-xl font-bold text-amber-100 mb-6">每月負債結構明細</h3>
+      <h3 class="text-xl font-bold text-amber-100 mb-6">每月負債結構明細（細項自動同步）</h3>
       <div class="h-[300px]"><canvas id="debtStructureChart"></canvas></div>
+      <p id="debtLegendHint" class="mt-3 text-xs text-slate-400"></p>
     </div>
   </main>
 
   <script>
-    /**
-     * ✅ 你的 Google Apps Script Web App URL
-     * 注意：如果你仍用 file:// 開啟 HTML，瀏覽器可能因 CORS 擋掉 fetch。
-     * 建議把此 HTML 上傳到 GitHub Pages/Netlify/Vercel，或改成同源 Apps Script 版本。
-     */
+    // ✅ 你的 Google Apps Script Web App URL（回傳 headers + rows）
     const API_URL = "https://script.google.com/macros/s/AKfycbzBL-nT-F0gHfYDdX-cq-o9ooO6bwcMSZmEQHBCGdNL-hK7RTgAqLn-NZT25izwpwNw/exec";
 
     let charts = {};
@@ -170,19 +150,6 @@
         maximumFractionDigits: 0,
       }).format(Number(num) || 0);
 
-    function pickLatestFilledRow(data) {
-      return [...data].reverse().find(d => {
-        const assets = Number(d.assets) || 0;
-        const netWorth = Number(d.netWorth) || 0;
-        const liab = Number(d.liab) || 0;
-        const stock = Number(d.stock) || 0;
-        const cash = Number(d.cash) || 0;
-        const re = Number(d.realEstate) || 0;
-        const others = Number(d.others) || 0;
-        return (assets + netWorth + liab + stock + cash + re + others) > 0;
-      }) || data[0];
-    }
-
     function destroyChart(key) {
       if (charts[key]) {
         charts[key].destroy();
@@ -192,58 +159,104 @@
 
     async function fetchData() {
       try {
-        const response = await fetch(API_URL, { method: "GET" });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-        const data = await response.json();
-        if (!Array.isArray(data)) throw new Error("API 回傳不是陣列資料");
-        return data;
-      } catch (error) {
-        console.error("無法抓取數據:", error);
-        return []; // ✅ 不用 mock，避免看起來像有資料
+        const resp = await fetch(API_URL, { method: "GET" });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const payload = await resp.json();
+        if (!payload || !Array.isArray(payload.headers) || !Array.isArray(payload.rows)) {
+          throw new Error("API 回傳格式不是 {headers, rows}");
+        }
+        return payload;
+      } catch (err) {
+        console.error("無法抓取數據:", err);
+        return { headers: [], rows: [] };
       }
     }
 
-    function updateUI(data) {
-      if (!data || !data.length) {
-        // 沒資料就把 loader 收掉，但 KPI 保持 0
-        const loader = document.getElementById("loader");
+    function idx(headers, name) {
+      return headers.findIndex(h => String(h).trim() === name);
+    }
+
+    function pickLatestFilledRow(headers, rows) {
+      // 以「總資產/淨資產/總負債/股票/現金/不動產/其他」任一有值，視為已填
+      const iMonth = idx(headers, "月份");
+      const iNet = idx(headers, "淨資產");
+      const iAssets = idx(headers, "總資產");
+      const iLiab = idx(headers, "總負債");
+      const iStock = idx(headers, "股票");
+      const iCash = idx(headers, "現金");
+      const iRE = idx(headers, "不動產");
+      const iOthers = idx(headers, "其他");
+
+      const safe = (r, i) => (i >= 0 ? (Number(r[i]) || 0) : 0);
+
+      const latest = [...rows].reverse().find(r => {
+        const sum = safe(r, iNet) + safe(r, iAssets) + safe(r, iLiab) + safe(r, iStock) + safe(r, iCash) + safe(r, iRE) + safe(r, iOthers);
+        return sum !== 0; // 允許負數（例如淨資產 -150）
+      });
+
+      return latest || rows[0] || null;
+    }
+
+    function getMonthLabel(headers, row) {
+      const iMonth = idx(headers, "月份");
+      if (!row || iMonth < 0) return "---";
+      const m = String(row[iMonth]).trim();
+      // 如果你表裡是 1~12，這裡轉成 1月…；如果你本來就寫 1月 也 OK
+      return m.endsWith("月") ? m : `${m}月`;
+    }
+
+    function updateUI(payload) {
+      const { headers, rows } = payload;
+
+      const loader = document.getElementById("loader");
+
+      if (!headers.length || !rows.length) {
         loader.style.opacity = "0";
         setTimeout(() => (loader.style.display = "none"), 500);
         return;
       }
 
-      const current = pickLatestFilledRow(data);
+      const current = pickLatestFilledRow(headers, rows);
 
-      // ✅ 最新更新日期跟著變
-      document.getElementById("latest-month").innerText =
-        "2026年 " + (current.month ?? "---");
+      // KPI indexes
+      const iNet = idx(headers, "淨資產");
+      const iAssets = idx(headers, "總資產");
+      const iLiab = idx(headers, "總負債");
 
-      // ✅ KPI：總淨資產 / 總資產 / 總負債
-      document.getElementById("kpi-net-worth").innerText =
-        fmt(Number(current.netWorth) || ((Number(current.assets) || 0) - (Number(current.liab) || 0)));
+      const netWorth = iNet >= 0 ? (Number(current[iNet]) || 0) : 0;
+      const assets = iAssets >= 0 ? (Number(current[iAssets]) || 0) : 0;
+      const liab = iLiab >= 0 ? (Number(current[iLiab]) || 0) : 0;
 
-      document.getElementById("kpi-assets").innerText = fmt(Number(current.assets) || 0);
-      document.getElementById("kpi-liabilities").innerText = fmt(Number(current.liab) || 0);
+      document.getElementById("latest-month").innerText = `2026年 ${getMonthLabel(headers, current)}`;
+      document.getElementById("kpi-net-worth").innerText = fmt(netWorth);
+      document.getElementById("kpi-assets").innerText = fmt(assets);
+      document.getElementById("kpi-liabilities").innerText = fmt(liab);
 
-      initCharts(data);
+      initCharts(payload);
 
-      const loader = document.getElementById("loader");
       loader.style.opacity = "0";
       setTimeout(() => (loader.style.display = "none"), 500);
     }
 
-    function initCharts(data) {
-      const months = data.map(d => d.month);
+    function initCharts(payload) {
+      const { headers, rows } = payload;
 
-      // ✅ 折線圖：優先使用 netWorth（更可靠）
-      const netWorthData = data.map(d =>
-        Number(d.netWorth) || ((Number(d.assets) || 0) - (Number(d.liab) || 0))
-      );
+      const iMonth = idx(headers, "月份");
+      const iNet = idx(headers, "淨資產");
+      const iStock = idx(headers, "股票");
+      const iCash = idx(headers, "現金");
+      const iRE = idx(headers, "不動產");
+      const iOthers = idx(headers, "其他");
+      const iLiabTotal = idx(headers, "總負債");
 
-      const latest = pickLatestFilledRow(data);
+      const months = rows.map(r => {
+        const m = iMonth >= 0 ? String(r[iMonth]).trim() : "";
+        return m.endsWith("月") ? m.replace("月","") : m; // 圖表軸用數字更乾淨（1~12）
+      });
 
-      // 1) 淨資產折線圖
+      // 1) 淨資產折線圖（直接用「淨資產」欄）
+      const netWorthData = rows.map(r => (iNet >= 0 ? (Number(r[iNet]) || 0) : 0));
+
       destroyChart("netWorth");
       charts.netWorth = new Chart(document.getElementById("netWorthChart"), {
         type: "line",
@@ -265,13 +278,16 @@
         }
       });
 
-      // 2) 核心資產配置（4 分類）
-      const stock = Number(latest.stock) || 0;
-      const cash = Number(latest.cash) || 0;
-      const realEstate = Number(latest.realEstate) || 0;
-      const others = Number(latest.others) || 0;
-      const totalAssetParts = stock + cash + realEstate + others;
+      // 最新已填月份
+      const current = pickLatestFilledRow(headers, rows);
 
+      // 2) 核心資產配置（股票 / 現金 / 不動產 / 其他）
+      const stock = iStock >= 0 ? (Number(current[iStock]) || 0) : 0;
+      const cash = iCash >= 0 ? (Number(current[iCash]) || 0) : 0;
+      const realEstate = iRE >= 0 ? (Number(current[iRE]) || 0) : 0;
+      const others = iOthers >= 0 ? (Number(current[iOthers]) || 0) : 0;
+
+      const totalAssetParts = stock + cash + realEstate + others;
       const pct = (v) => totalAssetParts ? Math.round(v / totalAssetParts * 100) : 0;
 
       document.getElementById("label-stock-pct").innerText = pct(stock) + "%";
@@ -298,17 +314,17 @@
         }
       });
 
-      // 3) 資產結構（堆疊）
+      // 3) 資產結構（堆疊）：固定四大類（即使你資產欄位之後加細項，也能再做更進階動態）
       destroyChart("assetStructure");
       charts.assetStructure = new Chart(document.getElementById("assetStructureChart"), {
         type: "bar",
         data: {
           labels: months,
           datasets: [
-            { label: "不動產", data: data.map(d => Number(d.realEstate) || 0), backgroundColor: "#059669" },
-            { label: "股票", data: data.map(d => Number(d.stock) || 0), backgroundColor: "#d4af37" },
-            { label: "現金", data: data.map(d => Number(d.cash) || 0), backgroundColor: "#3b82f6" },
-            { label: "其他", data: data.map(d => Number(d.others) || 0), backgroundColor: "#8b5cf6" }
+            { label: "不動產", data: rows.map(r => (iRE >= 0 ? (Number(r[iRE]) || 0) : 0)), backgroundColor: "#059669" },
+            { label: "股票", data: rows.map(r => (iStock >= 0 ? (Number(r[iStock]) || 0) : 0)), backgroundColor: "#d4af37" },
+            { label: "現金", data: rows.map(r => (iCash >= 0 ? (Number(r[iCash]) || 0) : 0)), backgroundColor: "#3b82f6" },
+            { label: "其他", data: rows.map(r => (iOthers >= 0 ? (Number(r[iOthers]) || 0) : 0)), backgroundColor: "#8b5cf6" }
           ]
         },
         options: {
@@ -319,30 +335,60 @@
         }
       });
 
-      // 4) 負債結構（堆疊）
+      // 4) 負債結構（堆疊）：✅「總負債」後面全部欄位視為負債細項（自動增刪）
+      const debtHint = document.getElementById("debtLegendHint");
+
+      if (iLiabTotal < 0) {
+        destroyChart("debtStructure");
+        debtHint.innerText = "找不到「總負債」欄位，請確認表頭名稱完全一致。";
+        return;
+      }
+
+      const debtItemStart = iLiabTotal + 1;
+      const debtHeaders = headers.slice(debtItemStart).filter(h => String(h).trim() !== "");
+
+      const debtIndexes = debtHeaders.map((h, k) => debtItemStart + k);
+
+      // 沒有細項就提示
+      if (!debtHeaders.length) {
+        destroyChart("debtStructure");
+        debtHint.innerText = "目前「總負債」右側沒有任何負債細項欄位（可在表格右側新增）。";
+        return;
+      }
+
+      // 生成不同顏色（不用固定色碼，避免你未來欄位很多時要手動）
+      const genColor = (i) => `hsl(${(i * 47) % 360} 70% 55%)`;
+
+      const debtDatasets = debtHeaders.map((name, i) => ({
+        label: name,
+        data: rows.map(r => (Number(r[debtIndexes[i]]) || 0)),
+        backgroundColor: genColor(i)
+      }));
+
       destroyChart("debtStructure");
       charts.debtStructure = new Chart(document.getElementById("debtStructureChart"), {
         type: "bar",
         data: {
           labels: months,
-          datasets: [
-            { label: "信貸", data: data.map(d => Number(d.credit) || 0), backgroundColor: "#ef4444" },
-            { label: "質押", data: data.map(d => Number(d.pledge) || 0), backgroundColor: "#f97316" }
-          ]
+          datasets: debtDatasets
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           scales: { x: { stacked: true }, y: { stacked: true } },
-          plugins: { legend: { labels: { color: "#cbd5e1" } } }
+          plugins: {
+            legend: { labels: { color: "#cbd5e1" } }
+          }
         }
       });
+
+      debtHint.innerText = `負債細項：${debtHeaders.join("、")}（自動同步）`;
     }
 
     window.onload = async () => {
       lucide.createIcons();
-      const data = await fetchData();
-      updateUI(data);
+      const payload = await fetchData();
+      updateUI(payload);
     };
   </script>
 </body>
