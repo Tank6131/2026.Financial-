@@ -94,7 +94,7 @@
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="lg:colj:col-span-2 card-bg p-6 rounded-2xl shadow-xl h-[450px]">
+      <div class="lg:col-span-2 card-bg p-6 rounded-2xl shadow-xl h-[450px]">
         <h3 class="text-xl font-bold text-amber-100 mb-6">淨資產增長趨勢</h3>
         <div class="h-[350px]"><canvas id="netWorthChart"></canvas></div>
       </div>
@@ -177,25 +177,23 @@
     }
 
     function pickLatestFilledRow(headers, rows) {
-      // 以「總資產/淨資產/總負債/股票/現金/不動產/其他」任一有值，視為已填
-      const iMonth = idx(headers, "月份");
-      const iNet = idx(headers, "淨資產");
-      const iAssets = idx(headers, "總資產");
-      const iLiab = idx(headers, "總負債");
-      const iStock = idx(headers, "股票");
-      const iCash = idx(headers, "現金");
-      const iRE = idx(headers, "不動產");
-      const iOthers = idx(headers, "其他");
+  // 容錯：其他欄位可能叫「其他」或「其他資產」
+  const iNet = idx(headers, "淨資產");
+  const iAssets = idx(headers, "總資產");
+  const iLiab = idx(headers, "總負債");
+  const iStock = idx(headers, "股票");
+  const iCash = idx(headers, "現金");
+  const iRE = idx(headers, "不動產");
+  const iOthers = (idx(headers, "其他") >= 0) ? idx(headers, "其他") : idx(headers, "其他資產");
 
-      const safe = (r, i) => (i >= 0 ? (Number(r[i]) || 0) : 0);
+  // ✅ 不用「總和 != 0」，改成「任一欄位非 0」就視為已填
+  const latest = [...rows].reverse().find(r => {
+    const keys = [iNet, iAssets, iLiab, iStock, iCash, iRE, iOthers];
+    return keys.some(i => i >= 0 && Number(r[i]) !== 0);
+  });
 
-      const latest = [...rows].reverse().find(r => {
-        const sum = safe(r, iNet) + safe(r, iAssets) + safe(r, iLiab) + safe(r, iStock) + safe(r, iCash) + safe(r, iRE) + safe(r, iOthers);
-        return sum !== 0; // 允許負數（例如淨資產 -150）
-      });
-
-      return latest || rows[0] || null;
-    }
+  return latest || rows[0] || null;
+}
 
     function getMonthLabel(headers, row) {
       const iMonth = idx(headers, "月份");
@@ -246,7 +244,7 @@
       const iStock = idx(headers, "股票");
       const iCash = idx(headers, "現金");
       const iRE = idx(headers, "不動產");
-      const iOthers = idx(headers, "其他");
+      const iOthers = (idx(headers, "其他") >= 0) ? idx(headers, "其他") : idx(headers, "其他資產");
       const iLiabTotal = idx(headers, "總負債");
 
       const months = rows.map(r => {
