@@ -93,50 +93,58 @@
       </div>
     </div>
 
+    <!-- 淨資產趨勢 + 核心資產配置（2+1 欄） -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-  <!-- 左：淨資產增長趨勢 -->
-  <div class="lg:col-span-2 card-bg p-6 rounded-2xl shadow-xl">
-    <h3 class="text-xl font-bold text-amber-100 mb-6">淨資產增長趨勢</h3>
-    <div class="h-[350px]"><canvas id="netWorthChart"></canvas></div>
-  </div>
+      <!-- 左：淨資產增長趨勢 -->
+      <div class="lg:col-span-2 card-bg p-6 rounded-2xl shadow-xl">
+        <h3 class="text-xl font-bold text-amber-100 mb-6">淨資產增長趨勢</h3>
+        <div class="h-[350px]"><canvas id="netWorthChart"></canvas></div>
+      </div>
 
-  <!-- 右：核心資產配置 -->
-  <div class="card-bg p-6 rounded-2xl shadow-xl min-h-[450px]">
-    <h3 class="text-xl font-bold text-amber-100 mb-6">核心資產配置</h3>
-    <div class="h-[280px]">
-      <canvas id="assetAllocationChart"></canvas>
-    </div>
+      <!-- 右：核心資產配置 -->
+      <div class="card-bg p-6 rounded-2xl shadow-xl min-h-[450px]">
+        <h3 class="text-xl font-bold text-amber-100 mb-6">核心資產配置</h3>
 
-    <div class="mt-4 space-y-2 text-sm">
-      <div class="flex justify-between items-center gap-3">
-        <span class="text-slate-400 truncate">股票投資</span>
-        <span id="label-stock-pct" class="text-white tabular-nums shrink-0">--%</span>
+        <div class="h-[280px]">
+          <canvas id="assetAllocationChart"></canvas>
+        </div>
+
+        <!-- 4 分類百分比 -->
+        <div class="mt-4 space-y-2 text-sm">
+          <div class="flex justify-between items-center gap-3">
+            <span class="text-slate-400 truncate">股票投資</span>
+            <span id="label-stock-pct" class="text-white tabular-nums shrink-0">--%</span>
+          </div>
+          <div class="flex justify-between items-center gap-3">
+            <span class="text-slate-400 truncate">現金儲蓄</span>
+            <span id="label-cash-pct" class="text-white tabular-nums shrink-0">--%</span>
+          </div>
+          <div class="flex justify-between items-center gap-3">
+            <span class="text-slate-400 truncate">不動產</span>
+            <span id="label-re-pct" class="text-white tabular-nums shrink-0">--%</span>
+          </div>
+          <div class="flex justify-between items-center gap-3">
+            <span class="text-slate-400 truncate">其他</span>
+            <span id="label-others-pct" class="text-white tabular-nums shrink-0">--%</span>
+          </div>
+        </div>
       </div>
-      <div class="flex justify-between items-center gap-3">
-        <span class="text-slate-400 truncate">現金儲蓄</span>
-        <span id="label-cash-pct" class="text-white tabular-nums shrink-0">--%</span>
-      </div>
-      <div class="flex justify-between items-center gap-3">
-        <span class="text-slate-400 truncate">不動產</span>
-        <span id="label-re-pct" class="text-white tabular-nums shrink-0">--%</span>
-      </div>
-      <div class="flex justify-between items-center gap-3">
-        <span class="text-slate-400 truncate">其他</span>
-        <span id="label-others-pct" class="text-white tabular-nums shrink-0">--%</span>
-      </div>
-    </div>
-  </div>
-</div>
-    <div class="card-bg p-6 rounded-2xl shadow-xl">
-      <h3 class="text-xl font-bold text-amber-100 mb-6">每月資產結構明細</h3>
-      <div class="h-[350px]"><canvas id="assetStructureChart"></canvas></div>
     </div>
 
-    <div class="card-bg p-6 rounded-2xl shadow-xl">
-      <h3 class="text-xl font-bold text-amber-100 mb-6">每月負債結構明細（細項自動同步）</h3>
-      <div class="h-[300px]"><canvas id="debtStructureChart"></canvas></div>
-      <p id="debtLegendHint" class="mt-3 text-xs text-slate-400"></p>
+    <!-- 下方兩張圖表：左右並排（桌機），手機直排 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      <div class="card-bg p-6 rounded-2xl shadow-xl">
+        <h3 class="text-xl font-bold text-amber-100 mb-6">每月資產結構明細</h3>
+        <div class="h-[350px]"><canvas id="assetStructureChart"></canvas></div>
+      </div>
+
+      <div class="card-bg p-6 rounded-2xl shadow-xl">
+        <h3 class="text-xl font-bold text-amber-100 mb-6">每月負債結構明細（細項自動同步）</h3>
+        <div class="h-[300px]"><canvas id="debtStructureChart"></canvas></div>
+        <p id="debtLegendHint" class="mt-3 text-xs text-slate-400"></p>
+      </div>
     </div>
+
   </main>
 
   <script>
@@ -178,36 +186,39 @@
       return headers.findIndex(h => String(h).trim() === name);
     }
 
+    function getOtherAssetIndex(headers) {
+      const i = idx(headers, "其他");
+      if (i >= 0) return i;
+      return idx(headers, "其他資產");
+    }
+
     function pickLatestFilledRow(headers, rows) {
-  // 容錯：其他欄位可能叫「其他」或「其他資產」
-  const iNet = idx(headers, "淨資產");
-  const iAssets = idx(headers, "總資產");
-  const iLiab = idx(headers, "總負債");
-  const iStock = idx(headers, "股票");
-  const iCash = idx(headers, "現金");
-  const iRE = idx(headers, "不動產");
-  const iOthers = (idx(headers, "其他") >= 0) ? idx(headers, "其他") : idx(headers, "其他資產");
+      const iNet = idx(headers, "淨資產");
+      const iAssets = idx(headers, "總資產");
+      const iLiab = idx(headers, "總負債");
+      const iStock = idx(headers, "股票");
+      const iCash = idx(headers, "現金");
+      const iRE = idx(headers, "不動產");
+      const iOthers = getOtherAssetIndex(headers);
 
-  // ✅ 不用「總和 != 0」，改成「任一欄位非 0」就視為已填
-  const latest = [...rows].reverse().find(r => {
-    const keys = [iNet, iAssets, iLiab, iStock, iCash, iRE, iOthers];
-    return keys.some(i => i >= 0 && Number(r[i]) !== 0);
-  });
+      // ✅ 任一欄位非 0 就視為已填（避免正負相抵）
+      const latest = [...rows].reverse().find(r => {
+        const keys = [iNet, iAssets, iLiab, iStock, iCash, iRE, iOthers];
+        return keys.some(i => i >= 0 && Number(r[i]) !== 0);
+      });
 
-  return latest || rows[0] || null;
-}
+      return latest || rows[0] || null;
+    }
 
     function getMonthLabel(headers, row) {
       const iMonth = idx(headers, "月份");
       if (!row || iMonth < 0) return "---";
       const m = String(row[iMonth]).trim();
-      // 如果你表裡是 1~12，這裡轉成 1月…；如果你本來就寫 1月 也 OK
       return m.endsWith("月") ? m : `${m}月`;
     }
 
     function updateUI(payload) {
       const { headers, rows } = payload;
-
       const loader = document.getElementById("loader");
 
       if (!headers.length || !rows.length) {
@@ -218,7 +229,6 @@
 
       const current = pickLatestFilledRow(headers, rows);
 
-      // KPI indexes
       const iNet = idx(headers, "淨資產");
       const iAssets = idx(headers, "總資產");
       const iLiab = idx(headers, "總負債");
@@ -246,15 +256,16 @@
       const iStock = idx(headers, "股票");
       const iCash = idx(headers, "現金");
       const iRE = idx(headers, "不動產");
-      const iOthers = (idx(headers, "其他") >= 0) ? idx(headers, "其他") : idx(headers, "其他資產");
+      const iOthers = getOtherAssetIndex(headers);
       const iLiabTotal = idx(headers, "總負債");
 
-      const months = rows.map(r => {
+      const months = rows.map((r, idxRow) => {
         const m = iMonth >= 0 ? String(r[iMonth]).trim() : "";
-        return m.endsWith("月") ? m.replace("月","") : m; // 圖表軸用數字更乾淨（1~12）
+        const mm = m.endsWith("月") ? m.replace("月", "") : m;
+        return mm || String(idxRow + 1);
       });
 
-      // 1) 淨資產折線圖（直接用「淨資產」欄）
+      // 1) 淨資產折線圖
       const netWorthData = rows.map(r => (iNet >= 0 ? (Number(r[iNet]) || 0) : 0));
 
       destroyChart("netWorth");
@@ -281,7 +292,7 @@
       // 最新已填月份
       const current = pickLatestFilledRow(headers, rows);
 
-      // 2) 核心資產配置（股票 / 現金 / 不動產 / 其他）
+      // 2) 核心資產配置
       const stock = iStock >= 0 ? (Number(current[iStock]) || 0) : 0;
       const cash = iCash >= 0 ? (Number(current[iCash]) || 0) : 0;
       const realEstate = iRE >= 0 ? (Number(current[iRE]) || 0) : 0;
@@ -314,7 +325,7 @@
         }
       });
 
-      // 3) 資產結構（堆疊）：固定四大類（即使你資產欄位之後加細項，也能再做更進階動態）
+      // 3) 資產結構（堆疊）
       destroyChart("assetStructure");
       charts.assetStructure = new Chart(document.getElementById("assetStructureChart"), {
         type: "bar",
@@ -335,7 +346,7 @@
         }
       });
 
-      // 4) 負債結構（堆疊）：✅「總負債」後面全部欄位視為負債細項（自動增刪）
+      // 4) 負債結構（堆疊）：總負債後面全部欄位視為負債細項
       const debtHint = document.getElementById("debtLegendHint");
 
       if (iLiabTotal < 0) {
@@ -346,17 +357,14 @@
 
       const debtItemStart = iLiabTotal + 1;
       const debtHeaders = headers.slice(debtItemStart).filter(h => String(h).trim() !== "");
-
       const debtIndexes = debtHeaders.map((h, k) => debtItemStart + k);
 
-      // 沒有細項就提示
       if (!debtHeaders.length) {
         destroyChart("debtStructure");
         debtHint.innerText = "目前「總負債」右側沒有任何負債細項欄位（可在表格右側新增）。";
         return;
       }
 
-      // 生成不同顏色（不用固定色碼，避免你未來欄位很多時要手動）
       const genColor = (i) => `hsl(${(i * 47) % 360} 70% 55%)`;
 
       const debtDatasets = debtHeaders.map((name, i) => ({
