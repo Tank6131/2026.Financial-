@@ -99,31 +99,33 @@
         <div class="h-[350px]"><canvas id="netWorthChart"></canvas></div>
       </div>
 
-      <div class="card-bg p-6 rounded-2xl shadow-xl h-[450px]">
-        <h3 class="text-xl font-bold text-amber-100 mb-6">核心資產配置</h3>
-        <div class="h-[280px]"><canvas id="assetAllocationChart"></canvas></div>
+      <div class="card-bg p-6 rounded-2xl shadow-xl min-h-[450px]">
+  <h3 class="text-xl font-bold text-amber-100 mb-6">核心資產配置</h3>
 
-        <!-- 4 分類百分比 -->
-        <div class="mt-4 space-y-2 text-sm">
-          <div class="flex justify-between">
-            <span class="text-slate-400">股票投資</span>
-            <span id="label-stock-pct" class="text-white">--%</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-slate-400">現金儲蓄</span>
-            <span id="label-cash-pct" class="text-white">--%</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-slate-400">不動產</span>
-            <span id="label-re-pct" class="text-white">--%</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-slate-400">其他</span>
-            <span id="label-others-pct" class="text-white">--%</span>
-          </div>
-        </div>
-      </div>
+  <div class="h-[280px]">
+    <canvas id="assetAllocationChart"></canvas>
+  </div>
+
+  <!-- 4 分類百分比 -->
+  <div class="mt-4 space-y-2 text-sm">
+    <div class="flex justify-between items-center gap-3">
+      <span class="text-slate-400 truncate">股票投資</span>
+      <span id="label-stock-pct" class="text-white tabular-nums shrink-0">--%</span>
     </div>
+    <div class="flex justify-between items-center gap-3">
+      <span class="text-slate-400 truncate">現金儲蓄</span>
+      <span id="label-cash-pct" class="text-white tabular-nums shrink-0">--%</span>
+    </div>
+    <div class="flex justify-between items-center gap-3">
+      <span class="text-slate-400 truncate">不動產</span>
+      <span id="label-re-pct" class="text-white tabular-nums shrink-0">--%</span>
+    </div>
+    <div class="flex justify-between items-center gap-3">
+      <span class="text-slate-400 truncate">其他</span>
+      <span id="label-others-pct" class="text-white tabular-nums shrink-0">--%</span>
+    </div>
+  </div>
+</div>
 
     <div class="card-bg p-6 rounded-2xl shadow-xl">
       <h3 class="text-xl font-bold text-amber-100 mb-6">每月資產結構明細</h3>
