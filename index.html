@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2026 年度資產負債財務儀表板</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap");
+
+    body {
+      font-family: "Noto Sans TC", sans-serif;
+      background-color: #020617;
+      background-image: radial-gradient(
+        circle at 2px 2px,
+        rgba(212, 175, 55, 0.05) 1px,
+        transparent 0
+      );
+      background-size: 40px 40px;
+      color: #f8fafc;
+    }
+
+    .gold-gradient-text {
+      background: linear-gradient(to right, #d4af37, #fde68a, #d4af37);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .card-bg {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(212, 175, 55, 0.2);
+      backdrop-filter: blur(10px);
+    }
+
+    .gold-border {
+      border-left: 4px solid #d4af37;
+    }
+
+    /* 載入中動畫 */
+    #loader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #020617;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      transition: opacity 0.5s;
+    }
+  </style>
+</head>
+
+<body class="p-4 md:p-8 min-h-screen">
+  <div id="loader">
+    <div class="text-amber-500 animate-pulse text-xl font-bold">
+      同步 Google Sheets 數據中...
+    </div>
+  </div>
+
+  <header class="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-center border-b border-yellow-900/30 pb-6">
+    <div>
+      <h1 class="text-3xl md:text-4xl font-bold gold-gradient-text mb-2">2026 年度資產負債總覽</h1>
+      <p class="text-slate-400 flex items-center gap-2">
+        <i data-lucide="calendar" class="w-4 h-4"></i>
+        數據更新至：<span id="latest-month" class="text-amber-200 font-medium">---</span>
+      </p>
+    </div>
+
+    <div class="mt-4 md:mt-0 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-sm font-medium">
+      <span class="flex items-center gap-2">
+        <span class="relative flex h-3 w-3">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+        </span>
+        即時雲端數據同步
+      </span>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto space-y-6">
+
+    <!-- KPI：總淨資產 / 總資產 / 總負債 -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="card-bg p-6 rounded-2xl shadow-xl gold-border">
+        <p class="text-slate-400 font-medium mb-4">總淨資產 (Net Worth)</p>
+        <h2 id="kpi-net-worth" class="text-3xl font-bold text-white mb-1">$0</h2>
+        <p class="text-xs text-emerald-400 flex items-center gap-1">最新即時數據</p>
+      </div>
+
+      <div class="card-bg p-6 rounded-2xl shadow-xl border-l-4 border-blue-400/50">
+        <p class="text-slate-400 font-medium mb-4">總資產 (Total Assets)</p>
+        <h2 id="kpi-assets" class="text-3xl font-bold text-white mb-1">$0</h2>
+        <p class="text-xs text-blue-300">年度最新資產總額</p>
+      </div>
+
+      <div class="card-bg p-6 rounded-2xl shadow-xl border-l-4 border-red-500/50">
+        <p class="text-slate-400 font-medium mb-4">總負債 (Liabilities)</p>
+        <h2 id="kpi-liabilities" class="text-3xl font-bold text-white mb-1">$0</h2>
+        <p class="text-xs text-slate-500">含信貸與質押</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 card-bg p-6 rounded-2xl shadow-xl h-[450px]">
+        <h3 class="text-xl font-bold text-amber-100 mb-6">淨資產增長趨勢</h3>
+        <div class="h-[350px]"><canvas id="netWorthChart"></canvas></div>
+      </div>
+
+      <div class="card-bg p-6 rounded-2xl shadow-xl h-[450px]">
+        <h3 class="text-xl font-bold text-amber-100 mb-6">核心資產配置</h3>
+        <div class="h-[280px]"><canvas id="assetAllocationChart"></canvas></div>
+
+        <!-- 4 分類百分比 -->
+        <div class="mt-4 space-y-2 text-sm">
+          <div class="flex justify-between">
+            <span class="text-slate-400">股票投資</span>
+            <span id="label-stock-pct" class="text-white">--%</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">現金儲蓄</span>
+            <span id="label-cash-pct" class="text-white">--%</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">不動產</span>
+            <span id="label-re-pct" class="text-white">--%</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">其他</span>
+            <span id="label-others-pct" class="text-white">--%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-bg p-6 rounded-2xl shadow-xl">
+      <h3 class="text-xl font-bold text-amber-100 mb-6">每月資產結構明細</h3>
+      <div class="h-[350px]"><canvas id="assetStructureChart"></canvas></div>
+    </div>
+
+    <div class="card-bg p-6 rounded-2xl shadow-xl">
+      <h3 class="text-xl font-bold text-amber-100 mb-6">每月負債結構明細</h3>
+      <div class="h-[300px]"><canvas id="debtStructureChart"></canvas></div>
+    </div>
+  </main>
+
+  <script>
+    /**
+     * ✅ 你的 Google Apps Script Web App URL
+     * 注意：如果你仍用 file:// 開啟 HTML，瀏覽器可能因 CORS 擋掉 fetch。
+     * 建議把此 HTML 上傳到 GitHub Pages/Netlify/Vercel，或改成同源 Apps Script 版本。
+     */
+    const API_URL = "https://script.google.com/macros/s/AKfycbzBL-nT-F0gHfYDdX-cq-o9ooO6bwcMSZmEQHBCGdNL-hK7RTgAqLn-NZT25izwpwNw/exec";
+
+    let charts = {};
+
+    const fmt = (num) =>
+      new Intl.NumberFormat("zh-TW", {
+        style: "currency",
+        currency: "TWD",
+        maximumFractionDigits: 0,
+      }).format(Number(num) || 0);
+
+    function pickLatestFilledRow(data) {
+      return [...data].reverse().find(d => {
+        const assets = Number(d.assets) || 0;
+        const netWorth = Number(d.netWorth) || 0;
+        const liab = Number(d.liab) || 0;
+        const stock = Number(d.stock) || 0;
+        const cash = Number(d.cash) || 0;
+        const re = Number(d.realEstate) || 0;
+        const others = Number(d.others) || 0;
+        return (assets + netWorth + liab + stock + cash + re + others) > 0;
+      }) || data[0];
+    }
+
+    function destroyChart(key) {
+      if (charts[key]) {
+        charts[key].destroy();
+        delete charts[key];
+      }
+    }
+
+    async function fetchData() {
+      try {
+        const response = await fetch(API_URL, { method: "GET" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const data = await response.json();
+        if (!Array.isArray(data)) throw new Error("API 回傳不是陣列資料");
+        return data;
+      } catch (error) {
+        console.error("無法抓取數據:", error);
+        return []; // ✅ 不用 mock，避免看起來像有資料
+      }
+    }
+
+    function updateUI(data) {
+      if (!data || !data.length) {
+        // 沒資料就把 loader 收掉，但 KPI 保持 0
+        const loader = document.getElementById("loader");
+        loader.style.opacity = "0";
+        setTimeout(() => (loader.style.display = "none"), 500);
+        return;
+      }
+
+      const current = pickLatestFilledRow(data);
+
+      // ✅ 最新更新日期跟著變
+      document.getElementById("latest-month").innerText =
+        "2026年 " + (current.month ?? "---");
+
+      // ✅ KPI：總淨資產 / 總資產 / 總負債
+      document.getElementById("kpi-net-worth").innerText =
+        fmt(Number(current.netWorth) || ((Number(current.assets) || 0) - (Number(current.liab) || 0)));
+
+      document.getElementById("kpi-assets").innerText = fmt(Number(current.assets) || 0);
+      document.getElementById("kpi-liabilities").innerText = fmt(Number(current.liab) || 0);
+
+      initCharts(data);
+
+      const loader = document.getElementById("loader");
+      loader.style.opacity = "0";
+      setTimeout(() => (loader.style.display = "none"), 500);
+    }
+
+    function initCharts(data) {
+      const months = data.map(d => d.month);
+
+      // ✅ 折線圖：優先使用 netWorth（更可靠）
+      const netWorthData = data.map(d =>
+        Number(d.netWorth) || ((Number(d.assets) || 0) - (Number(d.liab) || 0))
+      );
+
+      const latest = pickLatestFilledRow(data);
+
+      // 1) 淨資產折線圖
+      destroyChart("netWorth");
+      charts.netWorth = new Chart(document.getElementById("netWorthChart"), {
+        type: "line",
+        data: {
+          labels: months,
+          datasets: [{
+            label: "淨資產",
+            data: netWorthData,
+            borderColor: "#d4af37",
+            backgroundColor: "rgba(212, 175, 55, 0.1)",
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } }
+        }
+      });
+
+      // 2) 核心資產配置（4 分類）
+      const stock = Number(latest.stock) || 0;
+      const cash = Number(latest.cash) || 0;
+      const realEstate = Number(latest.realEstate) || 0;
+      const others = Number(latest.others) || 0;
+      const totalAssetParts = stock + cash + realEstate + others;
+
+      const pct = (v) => totalAssetParts ? Math.round(v / totalAssetParts * 100) : 0;
+
+      document.getElementById("label-stock-pct").innerText = pct(stock) + "%";
+      document.getElementById("label-cash-pct").innerText = pct(cash) + "%";
+      document.getElementById("label-re-pct").innerText = pct(realEstate) + "%";
+      document.getElementById("label-others-pct").innerText = pct(others) + "%";
+
+      destroyChart("alloc");
+      charts.alloc = new Chart(document.getElementById("assetAllocationChart"), {
+        type: "doughnut",
+        data: {
+          labels: ["股票", "現金", "不動產", "其他"],
+          datasets: [{
+            data: [stock, cash, realEstate, others],
+            backgroundColor: ["#d4af37", "#3b82f6", "#059669", "#8b5cf6"],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: "80%",
+          plugins: { legend: { display: false } }
+        }
+      });
+
+      // 3) 資產結構（堆疊）
+      destroyChart("assetStructure");
+      charts.assetStructure = new Chart(document.getElementById("assetStructureChart"), {
+        type: "bar",
+        data: {
+          labels: months,
+          datasets: [
+            { label: "不動產", data: data.map(d => Number(d.realEstate) || 0), backgroundColor: "#059669" },
+            { label: "股票", data: data.map(d => Number(d.stock) || 0), backgroundColor: "#d4af37" },
+            { label: "現金", data: data.map(d => Number(d.cash) || 0), backgroundColor: "#3b82f6" },
+            { label: "其他", data: data.map(d => Number(d.others) || 0), backgroundColor: "#8b5cf6" }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { x: { stacked: true }, y: { stacked: true } },
+          plugins: { legend: { labels: { color: "#cbd5e1" } } }
+        }
+      });
+
+      // 4) 負債結構（堆疊）
+      destroyChart("debtStructure");
+      charts.debtStructure = new Chart(document.getElementById("debtStructureChart"), {
+        type: "bar",
+        data: {
+          labels: months,
+          datasets: [
+            { label: "信貸", data: data.map(d => Number(d.credit) || 0), backgroundColor: "#ef4444" },
+            { label: "質押", data: data.map(d => Number(d.pledge) || 0), backgroundColor: "#f97316" }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { x: { stacked: true }, y: { stacked: true } },
+          plugins: { legend: { labels: { color: "#cbd5e1" } } }
+        }
+      });
+    }
+
+    window.onload = async () => {
+      lucide.createIcons();
+      const data = await fetchData();
+      updateUI(data);
+    };
+  </script>
+</body>
+</html>
