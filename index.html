@@ -368,15 +368,15 @@
        ══════════════════════════════════════ */
     function getMockData() {
         return [
-            { month: '1月',  assets: 15000000, liab: 1200000, cash: 800000,  stock: 3000000, others: 200000, realEstate: 11000000, credit: 500000, pledge: 700000 },
-            { month: '2月',  assets: 15150000, liab: 1180000, cash: 850000,  stock: 3100000, others: 200000, realEstate: 11000000, credit: 480000, pledge: 700000 },
-            { month: '3月',  assets: 15300000, liab: 1160000, cash: 900000,  stock: 3200000, others: 200000, realEstate: 11000000, credit: 460000, pledge: 700000 },
-            { month: '4月',  assets: 15500000, liab: 1150000, cash: 920000,  stock: 3380000, others: 250000, realEstate: 11000000, credit: 450000, pledge: 700000 },
-            { month: '5月',  assets: 15700000, liab: 1140000, cash: 940000,  stock: 3510000, others: 250000, realEstate: 11000000, credit: 440000, pledge: 700000 },
-            { month: '6月',  assets: 15900000, liab: 1130000, cash: 950000,  stock: 3700000, others: 300000, realEstate: 11000000, credit: 430000, pledge: 700000 },
-            { month: '7月',  assets: 16200000, liab: 1120000, cash: 960000,  stock: 3990000, others: 350000, realEstate: 11000000, credit: 420000, pledge: 700000 },
-            { month: '8月',  assets: 16500000, liab: 1110000, cash: 970000,  stock: 4180000, others: 400000, realEstate: 11000000, credit: 410000, pledge: 700000 },
-            { month: '9月',  assets: 16800000, liab: 1200000, cash: 980000,  stock: 4320000, others: 500000, realEstate: 11000000, credit: 500000, pledge: 700000 },
+            { month: '1月', netWorth: 13800000, assets: 15000000, liab: 1200000, cash: 800000,  stock: 3000000, others: 200000, realEstate: 11000000, mortgage: 0, pledge: 700000, credit: 500000, loan: 0, otherLiab: 0 },
+            { month: '2月', netWorth: 13970000, assets: 15150000, liab: 1180000, cash: 850000,  stock: 3100000, others: 200000, realEstate: 11000000, mortgage: 0, pledge: 700000, credit: 480000, loan: 0, otherLiab: 0 },
+            { month: '3月', netWorth: 14140000, assets: 15300000, liab: 1160000, cash: 900000,  stock: 3200000, others: 200000, realEstate: 11000000, mortgage: 0, pledge: 700000, credit: 460000, loan: 0, otherLiab: 0 },
+            { month: '4月', netWorth: 14350000, assets: 15500000, liab: 1150000, cash: 920000,  stock: 3380000, others: 250000, realEstate: 11000000, mortgage: 0, pledge: 700000, credit: 450000, loan: 0, otherLiab: 0 },
+            { month: '5月', netWorth: 14560000, assets: 15700000, liab: 1140000, cash: 940000,  stock: 3510000, others: 250000, realEstate: 11000000, mortgage: 0, pledge: 700000, credit: 440000, loan: 0, otherLiab: 0 },
+            { month: '6月', netWorth: 14770000, assets: 15900000, liab: 1130000, cash: 950000,  stock: 3700000, others: 300000, realEstate: 11000000, mortgage: 0, pledge: 700000, credit: 430000, loan: 0, otherLiab: 0 },
+            { month: '7月', netWorth: 15080000, assets: 16200000, liab: 1120000, cash: 960000,  stock: 3990000, others: 350000, realEstate: 11000000, mortgage: 0, pledge: 700000, credit: 420000, loan: 0, otherLiab: 0 },
+            { month: '8月', netWorth: 15390000, assets: 16500000, liab: 1110000, cash: 970000,  stock: 4180000, others: 400000, realEstate: 11000000, mortgage: 0, pledge: 700000, credit: 410000, loan: 0, otherLiab: 0 },
+            { month: '9月', netWorth: 15600000, assets: 16800000, liab: 1200000, cash: 980000,  stock: 4320000, others: 500000, realEstate: 11000000, mortgage: 0, pledge: 700000, credit: 500000, loan: 0, otherLiab: 0 },
         ];
     }
 
@@ -386,7 +386,7 @@
     function updateUI(data, isMock = false) {
         const current = data[data.length - 1];
         document.getElementById('latest-month').textContent = '2026年 ' + current.month;
-        document.getElementById('kpi-net-worth').textContent  = fmt(current.assets - current.liab);
+        document.getElementById('kpi-net-worth').textContent  = fmt(current.netWorth || (current.assets - current.liab));
         document.getElementById('kpi-liabilities').textContent = fmt(current.liab);
         document.getElementById('kpi-cash').textContent        = fmt(current.cash);
 
@@ -420,7 +420,7 @@
 
     function initCharts(data) {
         const months     = data.map(d => d.month);
-        const netWorthData = data.map(d => d.assets - d.liab);
+        const netWorthData = data.map(d => d.netWorth || (d.assets - d.liab));
         const current    = data[data.length - 1];
 
         /* ── 淨資產趨勢折線圖 ── */
@@ -549,8 +549,11 @@
             data: {
                 labels: months,
                 datasets: [
-                    { label: '信貸', data: data.map(d => d.credit), backgroundColor: '#ef4444' },
-                    { label: '質押', data: data.map(d => d.pledge), backgroundColor: '#f97316' }
+                    { label: '房貸',     data: data.map(d => d.mortgage  || 0), backgroundColor: '#0ea5e9' },
+                    { label: '質押',     data: data.map(d => d.pledge    || 0), backgroundColor: '#f97316' },
+                    { label: '信貸',     data: data.map(d => d.credit    || 0), backgroundColor: '#ef4444' },
+                    { label: '借款',     data: data.map(d => d.loan      || 0), backgroundColor: '#a855f7' },
+                    { label: '其他負債', data: data.map(d => d.otherLiab || 0), backgroundColor: '#6b7280' }
                 ]
             },
             options: {
