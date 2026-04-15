@@ -5,42 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
     <title>2026 年度資產負債財務儀表板</title>
-    <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 Chart.js 圖表庫 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- 引入 Lucide 圖標庫 -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
-        
+
         body {
             font-family: 'Noto Sans TC', sans-serif;
-            background-color: #020617; /* 極深藍色底 */
+            background-color: #020617;
             background-image: radial-gradient(circle at 2px 2px, rgba(212, 175, 55, 0.05) 1px, transparent 0);
             background-size: 40px 40px;
             color: #f8fafc;
         }
 
-        /* 金色漸層文字效果 */
         .gold-gradient-text {
             background: linear-gradient(to right, #d4af37, #fde68a, #d4af37);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
-        /* 卡片背景與毛玻璃效果 */
         .card-bg {
             background: rgba(15, 23, 42, 0.8);
             border: 1px solid rgba(212, 175, 55, 0.2);
             backdrop-filter: blur(10px);
         }
 
-        .gold-border {
-            border-left: 4px solid #d4af37;
-        }
+        .gold-border { border-left: 4px solid #d4af37; }
 
-        /* 滿版覆蓋層設計 */
+        /* ─── 覆蓋層 ─── */
         #loader, #auth-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -48,34 +41,54 @@
             display: flex; justify-content: center; align-items: center;
             z-index: 100; transition: opacity 0.5s;
         }
-        
-        #auth-overlay {
-            z-index: 110;
-        }
+        #auth-overlay { z-index: 110; }
 
-        /* 錯誤提示氣泡 */
-        .error-toast {
-            background: #ef4444;
+        /* ─── Toast ─── */
+        .toast {
             color: white;
             padding: 10px 20px;
             border-radius: 8px;
             position: fixed;
-            bottom: 20px;
-            right: 20px;
+            bottom: 20px; right: 20px;
             z-index: 200;
             display: none;
             box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            transition: opacity 0.5s;
+        }
+        .toast-error   { background: #ef4444; }
+        .toast-warning { background: #f59e0b; }
+
+        /* ─── 逾時進度條 ─── */
+        #timeout-bar {
+            position: fixed;
+            bottom: 0; left: 0;
+            height: 3px;
+            background: linear-gradient(to right, #d4af37, #f59e0b);
+            width: 100%;
+            transform-origin: left;
+            transform: scaleX(1);
+            transition: transform linear;
+            z-index: 300;
+            display: none;
         }
     </style>
 </head>
 <body class="p-4 md:p-8 min-h-screen">
 
-    <!-- 錯誤提示小視窗 -->
-    <div id="error-toast" class="error-toast">
-        <span id="error-message">無法抓取雲端數據，已自動切換為模擬數據。</span>
+    <!-- 逾時進度條 -->
+    <div id="timeout-bar"></div>
+
+    <!-- Toast 通知 -->
+    <div id="toast" class="toast">
+        <span id="toast-message"></span>
     </div>
 
-    <!-- 登入驗證層 -->
+    <!-- ══════════════════════════════════════
+         登入驗證層
+         【安全性修正】前端不儲存密碼。
+         使用者輸入的密碼會連同 API 請求一起
+         送到 Google Apps Script，由後端驗證。
+         ══════════════════════════════════════ -->
     <div id="auth-overlay">
         <div class="card-bg p-8 rounded-2xl shadow-2xl w-full max-w-md text-center">
             <div class="mb-6">
@@ -85,12 +98,13 @@
                 <h2 class="text-2xl font-bold gold-gradient-text">身分驗證</h2>
                 <p class="text-slate-400 text-sm mt-2">請輸入存取密碼以查看您的財務報表</p>
             </div>
-            <input type="password" id="password-input" 
+            <input type="password" id="password-input"
                 class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500 mb-4"
                 placeholder="請輸入密碼">
-            <button onclick="checkAuth()" 
-                class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-lg transition-colors">
-                確認登入
+            <button id="login-btn" onclick="handleLogin()"
+                class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2">
+                <span id="login-btn-text">確認登入</span>
+                <span id="login-spinner" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
             </button>
             <p id="auth-error" class="text-red-400 text-xs mt-4 hidden">密碼錯誤，請重新輸入</p>
         </div>
@@ -104,9 +118,8 @@
         </div>
     </div>
 
-    <!-- 儀表板主內容區 (初始設為不可見) -->
+    <!-- 儀表板主內容 -->
     <div id="main-content" class="invisible">
-        <!-- 頁首標題區 -->
         <header class="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-center border-b border-yellow-900/30 pb-6">
             <div>
                 <h1 class="text-3xl md:text-4xl font-bold gold-gradient-text mb-2">2026 年度資產負債總覽</h1>
@@ -118,8 +131,8 @@
             <div id="sync-status" class="mt-4 md:mt-0 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-sm font-medium">
                 <span class="flex items-center gap-2">
                     <span id="sync-indicator" class="relative flex h-3 w-3">
-                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                      <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
                     </span>
                     <span id="sync-text">即時雲端數據同步</span>
                 </span>
@@ -127,21 +140,18 @@
         </header>
 
         <main class="max-w-7xl mx-auto space-y-6">
-            <!-- 關鍵指標卡片 (KPIs) -->
+            <!-- KPI 卡片 -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <!-- 總淨資產 -->
                 <div class="card-bg p-6 rounded-2xl shadow-xl gold-border">
                     <p class="text-slate-400 font-medium mb-4">總淨資產 (Net Worth)</p>
                     <h2 id="kpi-net-worth" class="text-3xl font-bold text-white mb-1">$0</h2>
                     <p class="text-xs text-emerald-400 flex items-center gap-1">最新即時數據</p>
                 </div>
-                <!-- 總負債 -->
                 <div class="card-bg p-6 rounded-2xl shadow-xl border-l-4 border-red-500/50">
                     <p class="text-slate-400 font-medium mb-4">總負債 (Liabilities)</p>
                     <h2 id="kpi-liabilities" class="text-3xl font-bold text-white mb-1">$0</h2>
                     <p class="text-xs text-slate-500">含信貸與質押</p>
                 </div>
-                <!-- 現金部位 -->
                 <div class="card-bg p-6 rounded-2xl shadow-xl border-l-4 border-blue-400/50">
                     <p class="text-slate-400 font-medium mb-4">現金部位 (Cash)</p>
                     <h2 id="kpi-cash" class="text-3xl font-bold text-white mb-1">$0</h2>
@@ -149,31 +159,32 @@
                 </div>
             </div>
 
-            <!-- 第一排圖表：趨勢與比例 -->
+            <!-- 圖表第一排 -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- 淨資產折線圖 -->
                 <div class="lg:col-span-2 card-bg p-6 rounded-2xl shadow-xl h-[450px]">
                     <h3 class="text-xl font-bold text-amber-100 mb-6 flex items-center gap-2">
                         <i data-lucide="line-chart" class="w-5 h-5"></i> 淨資產增長趨勢
                     </h3>
                     <div class="h-[350px]"><canvas id="netWorthChart"></canvas></div>
                 </div>
-                <!-- 甜甜圈圓餅圖 -->
                 <div class="card-bg p-6 rounded-2xl shadow-xl h-[450px]">
                     <h3 class="text-xl font-bold text-amber-100 mb-6 flex items-center gap-2">
                         <i data-lucide="pie-chart" class="w-5 h-5"></i> 核心資產配置
                     </h3>
-                    <div class="h-[280px] flex items-center justify-center">
+                    <p class="text-xs text-slate-500 -mt-4 mb-4">（股票、現金、不動產、其他）</p>
+                    <div class="h-[240px] flex items-center justify-center">
                         <canvas id="assetAllocationChart"></canvas>
                     </div>
                     <div class="mt-4 space-y-2 text-sm">
-                        <div class="flex justify-between"><span class="text-slate-400">股票投資</span><span id="label-stock-pct" class="text-white">--%</span></div>
-                        <div class="flex justify-between"><span class="text-slate-400">現金儲蓄</span><span id="label-cash-pct" class="text-white">--%</span></div>
+                        <div class="flex justify-between"><span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>股票</span><span id="label-stock-pct" class="text-white">--%</span></div>
+                        <div class="flex justify-between"><span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span>現金</span><span id="label-cash-pct" class="text-white">--%</span></div>
+                        <div class="flex justify-between"><span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-600 inline-block"></span>不動產</span><span id="label-realestate-pct" class="text-white">--%</span></div>
+                        <div class="flex justify-between"><span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-violet-500 inline-block"></span>其他</span><span id="label-others-pct" class="text-white">--%</span></div>
                     </div>
                 </div>
             </div>
 
-            <!-- 資產結構明細圖 -->
+            <!-- 資產結構 -->
             <div class="card-bg p-6 rounded-2xl shadow-xl">
                 <h3 class="text-xl font-bold text-amber-100 mb-6 flex items-center gap-2">
                     <i data-lucide="bar-chart-3" class="w-5 h-5"></i> 每月資產結構明細
@@ -181,7 +192,7 @@
                 <div class="h-[350px]"><canvas id="assetStructureChart"></canvas></div>
             </div>
 
-            <!-- 負債結構明細圖 -->
+            <!-- 負債結構 -->
             <div class="card-bg p-6 rounded-2xl shadow-xl">
                 <h3 class="text-xl font-bold text-amber-100 mb-6 flex items-center gap-2">
                     <i data-lucide="layers" class="w-5 h-5"></i> 每月負債結構明細
@@ -196,214 +207,376 @@
     </div>
 
     <script>
-        /**
-         * 1. 數據源與存取密碼設定
-         * 修改說明：
-         * 請將下面的 API_URL 修改為： '您的GAS網址?token=您的金鑰'
-         * 範例： 'https://script.google.com/macros/s/XXX/exec?token=123456'
-         */
-        const API_URL = 'https://script.google.com/macros/s/AKfycbyDsKWUrK9M1vT0M2jtcxueCuv5dKgxjXI1pgAeSMacseAuISJTLCUFj-fahwvAVwZ3/exec?token=your_unique_secure_token_2026';
-        
-        const ACCESS_PASSWORD = 'Admin16190512'; 
+    /**
+     * ══════════════════════════════════════════════════════
+     * 設定區
+     *
+     * API_URL：請替換為您的 GAS 部署網址（不含 token）
+     *          密碼由前端在請求時動態附加，GAS 端負責驗證。
+     *          GAS 端若密碼錯誤，請回傳 { error: 'UNAUTHORIZED' }
+     *          密碼正確才回傳數據陣列。
+     *
+     * FETCH_TIMEOUT_MS：API 最長等待毫秒數（預設 10 秒）
+     * ══════════════════════════════════════════════════════
+     */
+    const API_BASE_URL   = 'https://script.google.com/macros/s/AKfycbyDsKWUrK9M1vT0M2jtcxueCuv5dKgxjXI1pgAeSMacseAuISJTLCUFj-fahwvAVwZ3/exec';
+    const FETCH_TIMEOUT_MS = 10000;
 
-        const fmt = (num) => new Intl.NumberFormat('zh-TW', { 
-            style: 'currency', 
-            currency: 'TWD', 
-            maximumFractionDigits: 0 
-        }).format(num);
+    /* ── 圖表實例快取（防止重複渲染） ── */
+    const chartInstances = {};
 
-        function checkAuth() {
-            const input = document.getElementById('password-input').value;
-            const errorLabel = document.getElementById('auth-error');
-            
-            if (input === ACCESS_PASSWORD) {
-                document.getElementById('auth-overlay').style.opacity = '0';
-                setTimeout(() => {
-                    document.getElementById('auth-overlay').style.display = 'none';
-                    document.getElementById('main-content').classList.remove('invisible');
-                    document.getElementById('loader').classList.remove('hidden');
-                    startApp();
-                }, 500);
-            } else {
-                errorLabel.classList.remove('hidden');
-            }
+    /* ── 數字格式化 ── */
+    const fmt = (num) => new Intl.NumberFormat('zh-TW', {
+        style: 'currency', currency: 'TWD', maximumFractionDigits: 0
+    }).format(num);
+
+    /* ══════════════════════
+       Toast 通知系統
+       ══════════════════════ */
+    let toastTimer = null;
+    function showToast(message, type = 'error', duration = 5000) {
+        const el  = document.getElementById('toast');
+        const msg = document.getElementById('toast-message');
+        el.className = `toast toast-${type}`;
+        msg.textContent = message;
+        el.style.display = 'block';
+        el.style.opacity = '1';
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+            el.style.opacity = '0';
+            setTimeout(() => { el.style.display = 'none'; }, 500);
+        }, duration);
+    }
+
+    /* ══════════════════════════════════════
+       登入流程
+       【安全性修正重點】
+       - 前端不儲存密碼字串
+       - 密碼在每次請求時作為 URL 參數動態傳送
+       - GAS 端驗證密碼；驗證失敗回傳 { error: 'UNAUTHORIZED' }
+       ══════════════════════════════════════ */
+    async function handleLogin() {
+        const password = document.getElementById('password-input').value.trim();
+        const errorLabel = document.getElementById('auth-error');
+        const btn = document.getElementById('login-btn');
+        const btnText = document.getElementById('login-btn-text');
+        const spinner = document.getElementById('login-spinner');
+
+        if (!password) {
+            errorLabel.textContent = '請輸入密碼';
+            errorLabel.classList.remove('hidden');
+            return;
         }
 
-        document.getElementById('password-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') checkAuth();
+        errorLabel.classList.add('hidden');
+        btn.disabled = true;
+        btnText.textContent = '驗證中...';
+        spinner.classList.remove('hidden');
+
+        document.getElementById('auth-overlay').style.opacity = '0';
+        setTimeout(() => {
+            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('main-content').classList.remove('invisible');
+            document.getElementById('loader').classList.remove('hidden');
+            startApp(password);
+        }, 500);
+    }
+
+    document.getElementById('password-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleLogin();
+    });
+
+    /* ══════════════════════════════════════
+       Fetch 數據（含逾時控制）
+       ══════════════════════════════════════ */
+    async function fetchData(password) {
+        const controller = new AbortController();
+        const timeoutId  = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+        /* 顯示逾時進度條 */
+        const bar = document.getElementById('timeout-bar');
+        bar.style.display = 'block';
+        bar.style.transition = `transform ${FETCH_TIMEOUT_MS}ms linear`;
+        requestAnimationFrame(() => { bar.style.transform = 'scaleX(0)'; });
+
+        try {
+            const url = `${API_BASE_URL}?token=${encodeURIComponent(password)}`;
+            const response = await fetch(url, {
+                method: 'GET',
+                mode: 'cors',
+                cache: 'no-cache',
+                redirect: 'follow',
+                signal: controller.signal
+            });
+
+            if (!response.ok) throw new Error('HTTP 錯誤：' + response.status);
+
+            const data = await response.json();
+
+            /* ── 後端回傳授權錯誤 ── */
+            if (data && data.error === 'UNAUTHORIZED') {
+                /* 重新顯示登入層 */
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('main-content').classList.add('invisible');
+                const overlay = document.getElementById('auth-overlay');
+                overlay.style.display = 'flex';
+                overlay.style.opacity = '1';
+                document.getElementById('auth-error').textContent = '密碼錯誤，請重新輸入';
+                document.getElementById('auth-error').classList.remove('hidden');
+                const btn = document.getElementById('login-btn');
+                btn.disabled = false;
+                document.getElementById('login-btn-text').textContent = '確認登入';
+                document.getElementById('login-spinner').classList.add('hidden');
+                document.getElementById('password-input').value = '';
+                return null;
+            }
+
+            if (data && data.error) throw new Error('API 錯誤：' + data.error);
+
+            return data;
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                console.warn('Fetch 逾時（超過', FETCH_TIMEOUT_MS, 'ms）');
+            } else {
+                console.error('Fetch 失敗：', err);
+            }
+            return null;
+        } finally {
+            clearTimeout(timeoutId);
+            bar.style.display = 'none';
+        }
+    }
+
+    /* ══════════════════════════════════════
+       主流程
+       ══════════════════════════════════════ */
+    async function startApp(password) {
+        let data = await fetchData(password);
+        let isUsingMock = false;
+
+        if (!data || !Array.isArray(data) || data.length === 0) {
+            data = getMockData();
+            isUsingMock = true;
+        }
+
+        updateUI(data, isUsingMock);
+    }
+
+    /* ══════════════════════════════════════
+       模擬數據
+       【修正】補全 1～9 月完整序列，避免折線圖斷層
+       ══════════════════════════════════════ */
+    function getMockData() {
+        return [
+            { month: '1月',  assets: 15000000, liab: 1200000, cash: 800000,  stock: 3000000, others: 200000, realEstate: 11000000, credit: 500000, pledge: 700000 },
+            { month: '2月',  assets: 15150000, liab: 1180000, cash: 850000,  stock: 3100000, others: 200000, realEstate: 11000000, credit: 480000, pledge: 700000 },
+            { month: '3月',  assets: 15300000, liab: 1160000, cash: 900000,  stock: 3200000, others: 200000, realEstate: 11000000, credit: 460000, pledge: 700000 },
+            { month: '4月',  assets: 15500000, liab: 1150000, cash: 920000,  stock: 3380000, others: 250000, realEstate: 11000000, credit: 450000, pledge: 700000 },
+            { month: '5月',  assets: 15700000, liab: 1140000, cash: 940000,  stock: 3510000, others: 250000, realEstate: 11000000, credit: 440000, pledge: 700000 },
+            { month: '6月',  assets: 15900000, liab: 1130000, cash: 950000,  stock: 3700000, others: 300000, realEstate: 11000000, credit: 430000, pledge: 700000 },
+            { month: '7月',  assets: 16200000, liab: 1120000, cash: 960000,  stock: 3990000, others: 350000, realEstate: 11000000, credit: 420000, pledge: 700000 },
+            { month: '8月',  assets: 16500000, liab: 1110000, cash: 970000,  stock: 4180000, others: 400000, realEstate: 11000000, credit: 410000, pledge: 700000 },
+            { month: '9月',  assets: 16800000, liab: 1200000, cash: 980000,  stock: 4320000, others: 500000, realEstate: 11000000, credit: 500000, pledge: 700000 },
+        ];
+    }
+
+    /* ══════════════════════════════════════
+       更新 UI
+       ══════════════════════════════════════ */
+    function updateUI(data, isMock = false) {
+        const current = data[data.length - 1];
+        document.getElementById('latest-month').textContent = '2026年 ' + current.month;
+        document.getElementById('kpi-net-worth').textContent  = fmt(current.assets - current.liab);
+        document.getElementById('kpi-liabilities').textContent = fmt(current.liab);
+        document.getElementById('kpi-cash').textContent        = fmt(current.cash);
+
+        if (isMock) {
+            showToast('無法連接雲端數據，已自動切換為模擬數據', 'warning', 8000);
+            const statusDiv = document.getElementById('sync-status');
+            statusDiv.className = 'mt-4 md:mt-0 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-medium';
+            document.getElementById('sync-text').textContent = 'API 連線異常（顯示模擬數據）';
+            document.getElementById('sync-indicator').innerHTML =
+                '<span class="relative inline-flex rounded-full h-3 w-3 bg-amber-400"></span>';
+        }
+
+        initCharts(data);
+
+        const loader = document.getElementById('loader');
+        loader.style.opacity = '0';
+        setTimeout(() => { loader.style.display = 'none'; }, 500);
+    }
+
+    /* ══════════════════════════════════════
+       圖表初始化
+       【修正1】每次建立前先 destroy() 舊實例
+       【修正2】圓餅圖使用全部資產計算百分比
+       ══════════════════════════════════════ */
+    function destroyChart(id) {
+        if (chartInstances[id]) {
+            chartInstances[id].destroy();
+            delete chartInstances[id];
+        }
+    }
+
+    function initCharts(data) {
+        const months     = data.map(d => d.month);
+        const netWorthData = data.map(d => d.assets - d.liab);
+        const current    = data[data.length - 1];
+
+        /* ── 淨資產趨勢折線圖 ── */
+        destroyChart('netWorthChart');
+        chartInstances['netWorthChart'] = new Chart(
+            document.getElementById('netWorthChart'), {
+            type: 'line',
+            data: {
+                labels: months,
+                datasets: [{
+                    label: '淨資產',
+                    data: netWorthData,
+                    borderColor: '#d4af37',
+                    borderWidth: 3,
+                    backgroundColor: 'rgba(212, 175, 55, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#d4af37',
+                    pointRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => fmt(ctx.parsed.y)
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        ticks: {
+                            color: '#94a3b8',
+                            callback: val => (val / 1000000).toFixed(1) + 'M'
+                        }
+                    },
+                    x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                }
+            }
         });
 
-        async function fetchData() {
-            try {
-                if (!API_URL || API_URL.includes('您的金鑰內容')) {
-                    throw new Error("API URL 未設定或 Token 未填入");
-                }
+        /* ── 資產配置圓餅圖（修正：分母為全部資產） ── */
+        const totalAssets = (current.stock || 0) + (current.cash || 0)
+                          + (current.realEstate || 0) + (current.others || 0);
 
-                const response = await fetch(API_URL, {
-                    method: 'GET',
-                    mode: 'cors',
-                    cache: 'no-cache',
-                    redirect: 'follow'
-                });
-                
-                if (!response.ok) throw new Error('HTTP 錯誤代碼: ' + response.status);
-                
-                const data = await response.json();
-                
-                // 檢查是否返回了授權錯誤訊息 (如果您在 GAS 中有自定義錯誤 JSON)
-                if (data && data.error) {
-                    throw new Error("API 授權失敗: " + data.error);
-                }
-                
-                return data;
-            } catch (error) {
-                console.error("Fetch 失敗:", error);
-                return null; 
-            }
+        if (totalAssets > 0) {
+            const pct = (v) => Math.round((v || 0) / totalAssets * 100) + '%';
+            document.getElementById('label-stock-pct').textContent      = pct(current.stock);
+            document.getElementById('label-cash-pct').textContent       = pct(current.cash);
+            document.getElementById('label-realestate-pct').textContent = pct(current.realEstate);
+            document.getElementById('label-others-pct').textContent     = pct(current.others);
         }
 
-        async function startApp() {
-            let data = await fetchData();
-            let isUsingMock = false;
-
-            if (!data || data.length === 0 || !Array.isArray(data)) {
-                data = getMockData();
-                isUsingMock = true;
-            }
-
-            updateUI(data, isUsingMock);
-        }
-
-        function getMockData() {
-            return [
-                { month: '1月', assets: 15000000, liab: 1200000, cash: 800000, stock: 3000000, others: 200000, realEstate: 11000000, credit: 500000, pledge: 700000 },
-                { month: '2月', assets: 15150000, liab: 1180000, cash: 850000, stock: 3100000, others: 200000, realEstate: 11000000, credit: 480000, pledge: 700000 },
-                { month: '9月', assets: 16800000, liab: 1200000, cash: 980000, stock: 4320000, others: 500000, realEstate: 11000000, credit: 500000, pledge: 700000 }
-            ];
-        }
-
-        function updateUI(data, isMock = false) {
-            const current = data[data.length - 1];
-            document.getElementById('latest-month').innerText = '2026年 ' + current.month;
-            document.getElementById('kpi-net-worth').innerText = fmt(current.assets - current.liab);
-            document.getElementById('kpi-liabilities').innerText = fmt(current.liab);
-            document.getElementById('kpi-cash').innerText = fmt(current.cash);
-
-            if (isMock) {
-                document.getElementById('error-toast').style.display = 'block';
-                const statusDiv = document.getElementById('sync-status');
-                statusDiv.classList.replace('bg-amber-500/10', 'bg-red-500/10');
-                statusDiv.classList.replace('border-amber-500/20', 'border-red-500/20');
-                statusDiv.classList.replace('text-amber-500', 'text-red-400');
-                document.getElementById('sync-text').innerText = 'API 驗證失敗或連線異常 (顯示模擬數據)';
-                document.getElementById('sync-indicator').innerHTML = '<span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>';
-            }
-
-            initCharts(data);
-            const loader = document.getElementById('loader');
-            loader.style.opacity = '0';
-            setTimeout(() => loader.style.display = 'none', 500);
-        }
-
-        function initCharts(data) {
-            const months = data.map(d => d.month);
-            const netWorthData = data.map(d => d.assets - d.liab);
-            const current = data[data.length - 1];
-
-            new Chart(document.getElementById('netWorthChart'), {
-                type: 'line',
-                data: {
-                    labels: months,
-                    datasets: [{
-                        label: '淨資產',
-                        data: netWorthData,
-                        borderColor: '#d4af37',
-                        borderWidth: 3,
-                        backgroundColor: 'rgba(212, 175, 55, 0.1)',
-                        fill: true,
-                        tension: 0.4,
-                        pointBackgroundColor: '#d4af37'
-                    }]
-                },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
-                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+        destroyChart('assetAllocationChart');
+        chartInstances['assetAllocationChart'] = new Chart(
+            document.getElementById('assetAllocationChart'), {
+            type: 'doughnut',
+            data: {
+                labels: ['股票', '現金', '不動產', '其他'],
+                datasets: [{
+                    data: [current.stock, current.cash, current.realEstate, current.others],
+                    backgroundColor: ['#d4af37', '#3b82f6', '#059669', '#8b5cf6'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '78%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => `${ctx.label}：${fmt(ctx.parsed)}`
+                        }
                     }
                 }
-            });
-
-            const totalCore = (current.cash || 0) + (current.stock || 0);
-            if(totalCore > 0) {
-                document.getElementById('label-stock-pct').innerText = Math.round(current.stock/totalCore*100) + '%';
-                document.getElementById('label-cash-pct').innerText = Math.round(current.cash/totalCore*100) + '%';
             }
-            
-            new Chart(document.getElementById('assetAllocationChart'), {
-                type: 'doughnut',
-                data: {
-                    labels: ['股票', '現金'],
-                    datasets: [{ 
-                        data: [current.stock, current.cash], 
-                        backgroundColor: ['#d4af37', '#3b82f6'], 
-                        borderWidth: 0
-                    }]
-                },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    cutout: '80%',
-                    plugins: { legend: { display: false } }
-                }
-            });
+        });
 
-            new Chart(document.getElementById('assetStructureChart'), {
-                type: 'bar',
-                data: {
-                    labels: months,
-                    datasets: [
-                        { label: '不動產', data: data.map(d => d.realEstate), backgroundColor: '#059669' },
-                        { label: '股票', data: data.map(d => d.stock), backgroundColor: '#d4af37' },
-                        { label: '現金', data: data.map(d => d.cash), backgroundColor: '#3b82f6' },
-                        { label: '其他', data: data.map(d => d.others), backgroundColor: '#8b5cf6' }
-                    ]
+        /* ── 資產結構堆疊長條圖 ── */
+        destroyChart('assetStructureChart');
+        chartInstances['assetStructureChart'] = new Chart(
+            document.getElementById('assetStructureChart'), {
+            type: 'bar',
+            data: {
+                labels: months,
+                datasets: [
+                    { label: '不動產', data: data.map(d => d.realEstate), backgroundColor: '#059669' },
+                    { label: '股票',   data: data.map(d => d.stock),      backgroundColor: '#d4af37' },
+                    { label: '現金',   data: data.map(d => d.cash),       backgroundColor: '#3b82f6' },
+                    { label: '其他',   data: data.map(d => d.others),     backgroundColor: '#8b5cf6' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    tooltip: {
+                        callbacks: { label: ctx => `${ctx.dataset.label}：${fmt(ctx.parsed.y)}` }
+                    }
                 },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    scales: { 
-                        x: { stacked: true, grid: { display: false }, ticks: { color: '#94a3b8' } }, 
-                        y: { stacked: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } } 
+                scales: {
+                    x: { stacked: true, grid: { display: false }, ticks: { color: '#94a3b8' } },
+                    y: {
+                        stacked: true,
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        ticks: {
+                            color: '#94a3b8',
+                            callback: val => (val / 1000000).toFixed(0) + 'M'
+                        }
                     }
                 }
-            });
+            }
+        });
 
-            new Chart(document.getElementById('debtStructureChart'), {
-                type: 'bar',
-                data: {
-                    labels: months,
-                    datasets: [
-                        { label: '信貸', data: data.map(d => d.credit), backgroundColor: '#ef4444' },
-                        { label: '質押', data: data.map(d => d.pledge), backgroundColor: '#f97316' }
-                    ]
+        /* ── 負債結構堆疊長條圖 ── */
+        destroyChart('debtStructureChart');
+        chartInstances['debtStructureChart'] = new Chart(
+            document.getElementById('debtStructureChart'), {
+            type: 'bar',
+            data: {
+                labels: months,
+                datasets: [
+                    { label: '信貸', data: data.map(d => d.credit), backgroundColor: '#ef4444' },
+                    { label: '質押', data: data.map(d => d.pledge), backgroundColor: '#f97316' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    tooltip: {
+                        callbacks: { label: ctx => `${ctx.dataset.label}：${fmt(ctx.parsed.y)}` }
+                    }
                 },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    scales: { 
-                        x: { stacked: true, grid: { display: false }, ticks: { color: '#94a3b8' } }, 
-                        y: { stacked: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } } 
+                scales: {
+                    x: { stacked: true, grid: { display: false }, ticks: { color: '#94a3b8' } },
+                    y: {
+                        stacked: true,
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        ticks: {
+                            color: '#94a3b8',
+                            callback: val => (val / 10000).toFixed(0) + '萬'
+                        }
                     }
                 }
-            });
-        }
+            }
+        });
+    }
 
-        window.onload = () => {
-            lucide.createIcons();
-        };
+    window.onload = () => { lucide.createIcons(); };
     </script>
 </body>
 </html>
