@@ -359,6 +359,14 @@
             isUsingMock = true;
         }
 
+        // 前端二次過濾：移除總資產為 0 的空列（試算表未填寫的月份）
+        data = data.filter(d => (d.assets > 0 || d.netWorth > 0));
+
+        if (data.length === 0) {
+            data = getMockData();
+            isUsingMock = true;
+        }
+
         updateUI(data, isUsingMock);
     }
 
@@ -384,7 +392,8 @@
        更新 UI
        ══════════════════════════════════════ */
     function updateUI(data, isMock = false) {
-        const current = data[data.length - 1];
+        // 取最後一筆有實際數據的記錄（防止空列被當成最新月份）
+        const current = [...data].reverse().find(d => (d.netWorth > 0 || d.assets > 0)) || data[data.length - 1];
         document.getElementById('latest-month').textContent = '2026年 ' + current.month;
         document.getElementById('kpi-net-worth').textContent  = fmt(current.netWorth || (current.assets - current.liab));
         document.getElementById('kpi-liabilities').textContent = fmt(current.liab);
@@ -466,17 +475,24 @@
             }
         });
 
-        /* ── 資產配置圓餅圖（修正：分母為全部資產） ── */
-        const totalAssets = (current.stock || 0) + (current.cash || 0)
-                          + (current.realEstate || 0) + (current.others || 0);
+        /* ── 資產配置圓餅圖 ── */
+        // 各細項值，若 GAS 有回傳則直接用，否則嘗試從 assets 推算
+        const sv = current.stock      || 0;
+        const cv = current.cash       || 0;
+        const rv = current.realEstate || 0;
+        const ov = current.others     || 0;
+        // 細項總和；若細項全為 0 但 assets 有值，顯示 assets 作為單一區塊
+        const sumParts = sv + cv + rv + ov;
+        const donutData  = sumParts > 0
+            ? [sv, cv, rv, ov]
+            : [current.assets || 0, 0, 0, 0];
+        const donutBase  = sumParts > 0 ? sumParts : (current.assets || 0);
+        const pct = (v) => donutBase > 0 ? Math.round(v / donutBase * 100) + '%' : '--%';
 
-        if (totalAssets > 0) {
-            const pct = (v) => Math.round((v || 0) / totalAssets * 100) + '%';
-            document.getElementById('label-stock-pct').textContent      = pct(current.stock);
-            document.getElementById('label-cash-pct').textContent       = pct(current.cash);
-            document.getElementById('label-realestate-pct').textContent = pct(current.realEstate);
-            document.getElementById('label-others-pct').textContent     = pct(current.others);
-        }
+        document.getElementById('label-stock-pct').textContent      = pct(sv);
+        document.getElementById('label-cash-pct').textContent       = pct(cv);
+        document.getElementById('label-realestate-pct').textContent = pct(rv);
+        document.getElementById('label-others-pct').textContent     = pct(ov);
 
         destroyChart('assetAllocationChart');
         chartInstances['assetAllocationChart'] = new Chart(
@@ -485,7 +501,7 @@
             data: {
                 labels: ['股票', '現金', '不動產', '其他'],
                 datasets: [{
-                    data: [current.stock, current.cash, current.realEstate, current.others],
+                    data: donutData,
                     backgroundColor: ['#d4af37', '#3b82f6', '#059669', '#8b5cf6'],
                     borderWidth: 0
                 }]
